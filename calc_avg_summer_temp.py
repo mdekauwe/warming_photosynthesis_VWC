@@ -20,19 +20,22 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def main(flux_dir, met_dir, output_dir):
+def main(flux_files, met_files, output_dir):
 
-    pass
+    for i in flux_files:
+        print(os.path.basename(i))
 
 
 if __name__ == "__main__":
 
-
-    flux_dir = "data/Flux/"
-    met_dir = "data/Met/"
+    flux_dir = "/Users/%s/research/all_fluxnet_files/flux" % (os.getlogin())
+    met_dir = "/Users/%s/research/all_fluxnet_files/met" % (os.getlogin())
     output_dir = "outputs"
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    main(flux_dir, met_dir, output_dir)
+    flux_files = glob.glob(os.path.join(flux_dir, "*.nc"))
+    met_files = glob.glob(os.path.join(met_dir, "*.nc"))
+
+    main(flux_files, met_files, output_dir)
