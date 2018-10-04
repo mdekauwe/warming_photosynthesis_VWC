@@ -54,6 +54,16 @@ def get_data(flux_fname, met_fname):
 
 def screen_files(df_flx, df_met, source):
 
+    KG_TO_G = 1000.0
+    MOL_TO_MMOL = 1000.0
+    G_TO_MOL_H20 = 1.0 / 18.0
+    HPA_TO_KPA = 0.1
+    KPA_TO_PA = 1000.0
+    SEC_TO_HR = 3600.0
+    SEC_TO_HLFHR = 1800.0
+    UMOL_TO_MOL = 0.000001
+    MOL_C_TO_GRAMS_C = 12.
+
     # Screen for measured and good gap-filled data
     if source == "OzFlux":
         # Measured = 0 ; 10 = instrument calibration correction,  good data
@@ -94,12 +104,10 @@ def screen_files(df_flx, df_met, source):
     diff = df_met.index.minute[1] - df_met.index.minute[0]
     if diff == 0:
         # hour gap i.e. Tumba
-        df_flx["GPP"] *= self.MOL_C_TO_GRAMS_C * self.UMOL_TO_MOL * \
-                         self.SEC_TO_HR
+        df_flx["GPP"] *= MOL_C_TO_GRAMS_C * UMOL_TO_MOL * SEC_TO_HR
     else:
         # 30 min gap
-        df_flx["GPP"] *= self.MOL_C_TO_GRAMS_C * self.UMOL_TO_MOL * \
-                         self.SEC_TO_HLFHR
+        df_flx["GPP"] *= MOL_C_TO_GRAMS_C * UMOL_TO_MOL * SEC_TO_HLFHR
 
     # Drop the stuff we don't need
     df_flx = df_flx[['GPP']]
@@ -121,6 +129,20 @@ def screen_files(df_flx, df_met, source):
                     (df_met.index.month == months[2])]
 
     return df_flx, df_met
+
+def get_three_most_productive_months(df):
+    # filter three most productive months
+    df_m = df.resample("M").mean()
+    missing_gpp = False
+
+    try:
+        df_m = df_m.sort_values("GPP", ascending=False)[:3]
+        months = df_m.index.month
+    except KeyError:
+        missing_gpp = True
+        months = None
+
+    return (months, missing_gpp)
 
 if __name__ == "__main__":
 
