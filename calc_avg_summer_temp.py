@@ -22,7 +22,12 @@ import pandas as pd
 
 def main(flux_files, met_files, output_dir):
 
+    out_cols = ["site","year","tair"]
+    ofname = os.path.join(output_dir, "site_tair.csv")
+    df_out = pd.DataFrame(columns=out_cols)
+
     for flux_fname, met_fname in zip(flux_files, met_files):
+
         site = os.path.basename(flux_fname).split(".")[0][0:6]
         years = os.path.basename(flux_fname).split(".")[0][7:16]
         source = os.path.basename(flux_fname).split(".")[0][17:].\
@@ -32,7 +37,20 @@ def main(flux_files, met_files, output_dir):
         (df_flx, df_met) = get_data(flux_fname, met_fname)
         (df_flx, df_met) = screen_files(df_flx, df_met, source)
 
-        sys.exit()
+        df_met_mth = df_met.resample('M').mean().dropna().copy()
+        cnt = df_met_mth.groupby([df_met_mth.month]).agg('count')
+
+        if len(cnt[cnt.year > 2]) > 0 and len(np.unique(df_met.year)) >= 4:
+            df_met_yr = df_met.resample('Y').mean().dropna().copy()
+            ta = df_met_yr.Tair.values
+            yrs = df_met_yr.index.year
+            for i, temp in enumerate(ta):
+                row = pd.Series([site, yrs[i], temp], index=out_cols)
+                df_out = df_out.append(row, ignore_index=True)
+
+    if os.path.exists(ofname):
+        os.remove(ofname)
+    df_out.to_csv(ofname, index=False)
 
 def get_data(flux_fname, met_fname):
 
@@ -63,6 +81,7 @@ def screen_files(df_flx, df_met, source):
     SEC_TO_HLFHR = 1800.0
     UMOL_TO_MOL = 0.000001
     MOL_C_TO_GRAMS_C = 12.
+    K_TO_DEGC = -273.15
 
     # Screen for measured and good gap-filled data
     if source == "OzFlux":
@@ -110,13 +129,18 @@ def screen_files(df_flx, df_met, source):
         df_flx["GPP"] *= MOL_C_TO_GRAMS_C * UMOL_TO_MOL * SEC_TO_HLFHR
 
     # Drop the stuff we don't need
-    df_flx = df_flx[['GPP']]
-    df_met = df_met[['Tair']]
+    df_flx = df_flx[['GPP']].copy()
+    df_met = df_met[['Tair']].copy()
+    df_met.Tair += K_TO_DEGC
 
     df_met = df_met.reset_index()
     df_met = df_met.set_index('time')
     df_flx = df_flx.reset_index()
     df_flx = df_flx.set_index('time')
+
+    df_met["year"] = df_met.index.year
+    df_met["month"] = df_met.index.month
+    df_met["doy"] = df_met.index.dayofyear
 
     (months, missing_gpp) = get_three_most_productive_months(df_flx)
 
@@ -127,6 +151,10 @@ def screen_files(df_flx, df_met, source):
     df_met = df_met[(df_met.index.month == months[0]) |
                     (df_met.index.month == months[1]) |
                     (df_met.index.month == months[2])]
+
+
+    df_met.dropna(inplace=True)
+    df_flx.dropna(inplace=True)
 
     return df_flx, df_met
 
